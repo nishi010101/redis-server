@@ -2,7 +2,12 @@
 
 A basic redis server written in Go.
 
-**Supported Commands**
+### **How to Run:**
+
+```go run cmd/redis/main.go```
+
+
+### **Supported Commands**
 
 * **PING [message]**
 
