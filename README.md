@@ -1,1 +1,1 @@
-# redis-server
+# redis-server-lite
