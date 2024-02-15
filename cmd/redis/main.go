@@ -193,14 +193,19 @@ LOOP:
 		var respString string
 		switch strings.ToUpper(command) {
 		case "PING":
-			respString = "PONG"
+			if len(*arguments) > 1 {
+				respString = "(error) ERR wrong number of arguments for 'ping' command"
+			} else if len(*arguments) == 1 {
+				respString = (*arguments)[0]
+			} else {
+				respString = "PONG"
+			}
 			writeResponse(*conn, respString)
 		case "ECHO":
-			for key, val := range *arguments {
-				respString = respString + val
-				if key < len(*arguments) {
-					respString = respString + " "
-				}
+			if len(*arguments) == 1 {
+				respString = (*arguments)[0]
+			} else {
+				respString = "(error) ERR wrong number of arguments for 'echo' command"
 			}
 			writeResponse(*conn, respString)
 		case "SET":
@@ -222,13 +227,14 @@ LOOP:
 				}
 
 				if index > 1 {
-					if (*arguments)[index] == "NX" || (*arguments)[index] == "XX" || (*arguments)[index] == "KEEPTTL" {
+					option := strings.ToUpper((*arguments)[index])
+					if option == "NX" || option == "XX" || option == "KEEPTTL" {
 						options = append(options, Option{
 							name:  (*arguments)[index],
 							value: nil,
 						})
 						index++
-					} else if (*arguments)[index] == "EX" || (*arguments)[index] == "PX" || (*arguments)[index] == "EXAT" || (*arguments)[index] == "PXAT" {
+					} else if option == "EX" || option == "PX" || option == "EXAT" || option == "PXAT" {
 						optionValIndex := index + 1
 						if optionValIndex >= len(*arguments) {
 							respString = fmt.Sprintf("No value given for option %s.", (*arguments)[index])
@@ -244,7 +250,7 @@ LOOP:
 						}
 
 					} else {
-						respString = fmt.Sprintf("Invalid option %s.", (*arguments)[index])
+						respString = "(error) ERR syntax error"
 						writeResponse(*conn, respString)
 						goto LOOP
 					}
@@ -263,7 +269,7 @@ LOOP:
 				//fmt.Println("value", value)
 				//fmt.Println("options", options)
 				for _, val := range options {
-					switch val.name {
+					switch strings.ToUpper(val.name) {
 					case "NX":
 						_, exists := data[key]
 						if exists {
@@ -402,6 +408,7 @@ LOOP:
 					respString = strconv.FormatInt(valInt+1, 10)
 					data[(*arguments)[0]] = dataVal{Value: respString, ExpiryTime: val.ExpiryTime}
 				} else {
+					dataMutex.Unlock()
 					respString = fmt.Sprintf("Cant increment! Not an Int Value.")
 					writeResponse(*conn, respString)
 					goto LOOP
@@ -417,6 +424,7 @@ LOOP:
 					respString = strconv.FormatInt(valInt-1, 10)
 					data[(*arguments)[0]] = dataVal{Value: respString, ExpiryTime: val.ExpiryTime}
 				} else {
+					dataMutex.Unlock()
 					respString = fmt.Sprintf("Cant increment! Not an Int Value.")
 					writeResponse(*conn, respString)
 					goto LOOP
@@ -440,7 +448,8 @@ LOOP:
 					}
 					respString = strconv.Itoa(len(finalList))
 				} else {
-					writeResponse(*conn, fmt.Sprintf("oopsie cant push, not a list"))
+					dataMutex.Unlock()
+					writeResponse(*conn, "(error) WRONGTYPE Operation against a key holding the wrong kind of value")
 					goto LOOP
 				}
 			} else {
@@ -467,7 +476,8 @@ LOOP:
 					}
 					respString = strconv.Itoa(len(finalList))
 				} else {
-					writeResponse(*conn, fmt.Sprintf("oopsie cant push, not a list"))
+					dataMutex.Unlock()
+					writeResponse(*conn, "(error) WRONGTYPE Operation against a key holding the wrong kind of value")
 					goto LOOP
 				}
 			} else {
